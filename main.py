@@ -1,6 +1,8 @@
 import os
 import platform
 import subprocess
+from decouple import config
+import time
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -9,6 +11,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 TEMPO_ESPERADO_ACESSSAR = 30
+SECRET_E = config('SECRET_EMAIL')
+SECRET_P = config('SECRET_PASSWORD')
 
 def identificar_sistema() -> str:
     sistema = platform.system()
@@ -21,54 +25,62 @@ def identificar_sistema() -> str:
 
 chrome_driver_path = identificar_sistema()
 
-# Dar permissão de execução apenas no Linux
 if platform.system() == "Linux":
     comando_chmod = ['chmod', '+x', chrome_driver_path]
     subprocess.run(comando_chmod)
 
-# Configurar opções do Chrome (se necessário)
 chrome_options = Options()
-# chrome_options.add_argument("--headless")  # Rodar em modo headless (sem interface gráfica)
+chrome_options.add_argument("--window-size=1920,1080")
 
-# Inicializar o serviço do ChromeDriver
 service = Service(chrome_driver_path)
-
-# Inicializar o WebDriver passando o serviço do ChromeDriver e opções do Chrome
 driver = webdriver.Chrome(service=service, options=chrome_options)
 
 try:
-    # Acessar a página de login do LinkedIn
     driver.get("https://www.linkedin.com/login/")
 
-    # Esperar até que o campo de nome de usuário esteja presente e visível  (componente react montar)
     username = WebDriverWait(driver, TEMPO_ESPERADO_ACESSSAR).until(EC.visibility_of_element_located((By.ID, 'username')))
-    username.send_keys('jhonasGuthierres@gmail.com')
+    username.send_keys(SECRET_E)
 
-    # Esperar até que o campo de senha esteja presente e visível (componente react montar)
     password = WebDriverWait(driver, TEMPO_ESPERADO_ACESSSAR).until(EC.visibility_of_element_located((By.ID, 'password')))
-    password.send_keys('JonasGutherres123')
+    password.send_keys(SECRET_P)
 
-    # Esperar até que o botão de login esteja presente e visível e clicar nele
     login_button = WebDriverWait(driver, TEMPO_ESPERADO_ACESSSAR).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '.btn__primary--large')))
     login_button.click()
 
-    # Esperar um pouco para a página carregar
     WebDriverWait(driver, TEMPO_ESPERADO_ACESSSAR).until(EC.url_changes("https://www.linkedin.com/login/"))
 
-    # Abrir a aba de newtwork
     driver.get("https://www.linkedin.com/mynetwork/grow/")
 
-    # Esperar um pouco para a página carregar
-    WebDriverWait(driver, TEMPO_ESPERADO_ACESSSAR).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'artdeco-button__icon')))
+    while True:
+        try:
+            # Localizar todos os botões que contêm "Conectar"
+            buttons = WebDriverWait(driver, TEMPO_ESPERADO_ACESSSAR).until(EC.presence_of_all_elements_located((By.XPATH, '//button[contains(@aria-label, "Convidar") and .//span[text()="Conectar"]]')))
 
-    # Exemplo de interação com um elemento na página (corrija o seletor CSS conforme necessário)
-    button = driver.find_element(By.CSS_SELECTOR, 'artdeco-button__icon')
-    button.click()
+            for button in buttons:
+                try:
+                    if button.is_displayed():
+                        button.click()
+                        print("Botão 'Conectar' clicado.")
+                        time.sleep(2)  # Esperar 2 segundos antes de procurar o próximo botão
+                except Exception as e:
+                    print(f"Erro ao tentar clicar no botão: {e}")
+
+            # Esperar antes de tentar encontrar novos elementos
+            time.sleep(10)
+
+            # Recarregar a página para procurar novos botões, se necessário
+            driver.refresh()
+
+        except Exception as e:
+            print(f"Erro encontrado: {e}")
+            time.sleep(40)
 
 finally:
-    driver.quit()
-    
-    # Fechar a janela do navegador, 
-    # pra fazer booot colocar em loop ficar seguindo ou adicionando pessoas
-    # outra abordagem que vc pode querer fazer é mapear o meet para entrar reunião e depois de um horario exato finalizar o loop e sair
-print("Fim da execução ")
+    print("Feche o navegador para terminar a execução.")
+    while True:
+        try:
+            time.sleep(60)
+        except KeyboardInterrupt:
+            break
+
+print("Fim da execução")
